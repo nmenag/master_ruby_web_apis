@@ -28,6 +28,20 @@ helpers do
 
     halt 406, 'Not Acceptable'
   end
+
+  def type
+    @type ||= accepted_media_type
+  end
+
+  def send_data(data = {})
+    if type == 'json'
+      content_type 'application/json'
+      data[:json].call.to_json if data[:json]
+    elsif type == 'xml'
+      content_type 'application/xml'
+      Gyoku.xml(data[:xml].call) if data[:xml]
+    end
+  end
 end
 
 before do
@@ -36,6 +50,16 @@ end
 
 get '/' do
   'Master Ruby Web APIs - Chapter 2'
+end
+
+def send_data(data = {})
+  if type == 'json'
+    content_type 'application/json'
+    data[:json].call.to_json if data[:json]
+  elsif type == 'xml'
+    content_type 'application/xml'
+    Gyoku.xml(data[:xml].call) if data[:xml]
+  end
 end
 
 # webapi.rb
@@ -50,26 +74,17 @@ end
 
 
 get '/users' do
-  type = accepted_media_type
-  if type == 'json'
-    content_type 'application/json'
-    users.map { |name, data| data.merge(id: name) }.to_json
-  elsif type == 'xml'
-    content_type 'application/xml'
-    Gyoku.xml(users: users)
-  end
+  send_data(
+    json: -> { users.map { |name, data| data.merge(id: name) } },
+    xml:  -> { { users: users } }
+  )
 end
 
 get '/users/:first_name' do |first_name|
-  type = accepted_media_type
-
-  if type == 'json'
-    content_type 'application/json'
-    users[first_name.to_sym].merge(id: first_name).to_json
-  elsif type == 'xml'
-    content_type 'application/xml'
-    Gyoku.xml(first_name => users[first_name.to_sym])
-  end
+  send_data(
+    json: -> { users[first_name.to_sym].merge(id: first_name) },
+    xml:  -> { { first_name => users[first_name.to_sym] } }
+  )
 end
 
 post '/users' do
@@ -88,20 +103,18 @@ put '/users/:first_name' do |first_name|
 end
 
 patch '/users/:first_name' do |first_name|
-  type = accepted_media_type
+
   user_client = JSON.parse(request.body.read)
   user_server = users[first_name.to_sym]
+
   user_client.each do |key, value|
     user_server[key.to_sym] = value
   end
 
-  if type == 'json'
-    content_type 'application/json'
-    user_server.merge(id: first_name).to_json
-  elsif type == 'xml'
-    content_type 'application/xml'
-    Gyoku.xml(first_name => user_server)
-  end
+  send_data(
+    json: -> { user_server.merge(id: first_name) },
+    xml:  -> { { first_name => user_server } }
+  )
 end
 
 delete '/users/:first_name' do |first_name|
