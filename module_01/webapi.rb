@@ -9,6 +9,8 @@ users = {
   'john':     { first_name: 'John', last_name: 'Smith', age: 28 }
 }
 
+deleted_users = {}
+
 helpers do
   def json_or_default?(type)
     ['application/json', 'application/*', '*/*'].include?(type.to_s)
@@ -21,12 +23,12 @@ helpers do
   def accepted_media_type
     return 'json' unless request.accept.any?
 
-    request.accept.each do |mt|
-      return 'json' if json_or_default?(mt)
-      return 'xml' if xml?(mt)
+    request.accept.each do |type|
+      return 'json' if json_or_default?(type)
+      return 'xml' if xml?(type)
     end
 
-    halt 406, 'Not Acceptable'
+    'json'
   end
 
   def type
@@ -73,6 +75,12 @@ end
 # delete '/users/:first_name'
 
 
+[:put, :patch, :delete].each do |method|
+  send(method, '/users') do
+    halt 405
+  end
+end
+
 get '/users' do
   send_data(
     json: -> { users.map { |name, data| data.merge(id: name) } },
@@ -81,14 +89,28 @@ get '/users' do
 end
 
 get '/users/:first_name' do |first_name|
-  send_data(
-    json: -> { users[first_name.to_sym].merge(id: first_name) },
-    xml:  -> { { first_name => users[first_name.to_sym] } }
-  )
+  halt 410 if deleted_users[first_name.to_sym]
+  halt 404 unless users[first_name.to_sym]
+  send_data(json: -> { users[first_name.to_sym].merge(id: first_name) },
+            xml:  -> { { first_name => users[first_name.to_sym] } })
 end
 
 post '/users' do
-  user = JSON.parse(request.body.read)
+  halt 415 unless request.env['CONTENT_TYPE'] == 'application/json'
+
+  begin
+    user = JSON.parse(request.body.read)
+  rescue JSON::ParserError => e
+    halt 400, send_data(json: -> { { message: e.to_s } },
+                        xml:  -> { { message: e.to_s } })
+  end
+
+  if users[user['first_name'].downcase.to_sym]
+    message = { message: "User #{user['first_name']} already in DB." }
+    halt 409, send_data(json: -> { message },
+                        xml:  -> { message })
+  end
+
   users[user['first_name'].downcase.to_sym] = user
   url = "http://localhost:4567/users/#{user['first_name']}"
   response.headers['Location'] = url
@@ -118,7 +140,9 @@ patch '/users/:first_name' do |first_name|
 end
 
 delete '/users/:first_name' do |first_name|
-  users.delete(first_name.to_sym)
+  first_name = first_name.to_sym
+  deleted_users[first_name] = users[first_name] if users[first_name]
+  users.delete(first_name)
   status 204
 end
 
