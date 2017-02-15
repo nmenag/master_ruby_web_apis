@@ -15,10 +15,31 @@
 #  updated_at   :datetime         not null
 #  cover        :string
 #
+# Indexes
+#
+#  index_books_on_author_id     (author_id)
+#  index_books_on_publisher_id  (publisher_id)
+#
 
 require 'rails_helper'
 
 RSpec.describe Book, type: :model do
+
+  context 'db' do
+    context 'columns' do
+      it { should have_db_column(:title).of_type(:string).with_options(null: true) }
+      it { should have_db_column(:subtitle).of_type(:text).with_options(null: true) }
+      it { should have_db_column(:isbn_10).of_type(:string).with_options(null: true) }
+      it { should have_db_column(:isbn_13).of_type(:string).with_options(null: true) }
+      it { should have_db_column(:description).of_type(:text).with_options(null: true) }
+      it { should have_db_column(:released_on).of_type(:date).with_options(null: true) }
+    end
+
+    context 'indexes' do
+      it { should have_db_index(:author_id) }
+      it { should have_db_index(:publisher_id) }
+    end
+  end
 
   context 'validations' do
     it { should validate_presence_of(:title) }
@@ -34,7 +55,7 @@ RSpec.describe Book, type: :model do
 
   context 'associations' do
     it { should belong_to(:publisher) }
-    it { should belong_to(:author) } 
+    it { should belong_to(:author) }
   end
 
   it 'has a valid factory' do

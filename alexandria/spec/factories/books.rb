@@ -15,6 +15,11 @@
 #  updated_at   :datetime         not null
 #  cover        :string
 #
+# Indexes
+#
+#  index_books_on_author_id     (author_id)
+#  index_books_on_publisher_id  (publisher_id)
+#
 
 FactoryGirl.define do
   factory :book, aliases: [:ruby_microscope] do
